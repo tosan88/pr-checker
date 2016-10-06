@@ -6,8 +6,8 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"time"
 	"strconv"
+	"time"
 )
 
 type checker struct {
@@ -29,7 +29,7 @@ func main() {
 	token := app.String(cli.StringOpt{
 		Name:   "token",
 		Value:  "",
-		Desc:   "The GitHub Api's OAuth Token. Optional but recommended to avoid rate limiting (which is 60reg/hour)",
+		Desc:   "The GitHub Api's OAuth Token.",
 		EnvVar: "TOKEN",
 	})
 
@@ -46,6 +46,13 @@ func main() {
 		Desc:   "The number of minimum days which an open PR could stay open. Only PRs which are opened more than that number of days are retrieved. Optional",
 		EnvVar: "MIN_DAYS",
 	})
+
+	app.Before = func() {
+		if *token == "" {
+			app.PrintHelp()
+			os.Exit(1)
+		}
+	}
 
 	app.Action = func() {
 		defer func(start time.Time) {
@@ -76,14 +83,11 @@ func main() {
 			contributors: *contributors,
 			minDays:      days,
 		}
+
 		chkr := checker{
 			conf:             conf,
 			client:           c,
 			coreContributors: make(map[string]User),
-		}
-
-		if *token != "" {
-			log.Println("TOKEN will be used in requests")
 		}
 
 		runChecker(&chkr)
@@ -105,16 +109,15 @@ func runChecker(chkr *checker) {
 			prs := chkr.collectPullRequests(repo.PullsURL.Url)
 
 			for _, pr := range prs {
-				//log.Printf("HtmlUrl: %v, Name: %v, Created at: %v, Updated at: %v\n", pr.HTMLURL, pr.Title, pr.CreatedAt, pr.UpdatedAt)
 				minDateTime := time.Now().AddDate(0, 0, chkr.conf.minDays)
-				// Created at: 2016-06-03T15:46:16Z
+
 				parsedCreatedAt, err := time.Parse("2006-01-02T15:04:05Z", pr.CreatedAt)
 				if err != nil {
 					log.Fatalf("ERROR time.Parse - %v\n", err)
 				}
 				if parsedCreatedAt.Before(minDateTime) {
-					//TODO get also user real name https://developer.github.com/v3/users/#get-a-single-user
-					log.Printf("PR %v (%v) open by %v(%v) since %v, updated at %v\n", pr.HTMLURL, pr.Title, pr.User, pr.User, pr.CreatedAt, pr.UpdatedAt)
+					realUserName := chkr.getUser(pr.User.UserURL)
+					log.Printf("PR %v (%v) open by %v(%v) since %v, updated at %v\n", pr.HTMLURL, pr.Title, pr.User.User, realUserName, pr.CreatedAt, pr.UpdatedAt)
 				}
 
 			}

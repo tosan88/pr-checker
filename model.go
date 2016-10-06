@@ -8,7 +8,8 @@ import (
 )
 
 type User struct {
-	User string `json:"login"`
+	User    string `json:"login"`
+	UserURL string `json:"url,omitempty"`
 }
 
 type GHURL struct {
@@ -24,7 +25,7 @@ type Repo struct {
 type PullReq struct {
 	HTMLURL   string `json:"html_url"`
 	Title     string `json:"title"`
-	User      string `json:"user.login"`
+	User      User   `json:"user"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }

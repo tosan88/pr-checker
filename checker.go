@@ -3,7 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strings"
@@ -18,7 +19,7 @@ func (chkr *checker) collectPullRequests(firstPageLink string) (prs []PullReq) {
 		prsPart, nextPageLink = chkr.getPullRequests(nextPageLink)
 		prs = append(prs, prsPart...)
 	}
-	log.Printf("DEBUG - # of PRs: %v\n", len(prs))
+	//log.Printf("DEBUG - # of PRs: %v\n", len(prs))
 	return
 }
 
@@ -40,7 +41,7 @@ func (chkr *checker) collectRepos() (repos []Repo) {
 		reposPart, nextPageLink = chkr.getRepos(nextPageLink)
 		repos = append(repos, reposPart...)
 	}
-	log.Printf("DEBUG - # of repos: %v\n", len(repos))
+	//log.Printf("DEBUG - # of repos: %v\n", len(repos))
 	return
 }
 
@@ -65,8 +66,8 @@ func (chkr *checker) decideCoreContributors() {
 
 func (chkr *checker) isAnyCoreContributor(users []User) bool {
 	for _, contr := range users {
-		if user, found := chkr.coreContributors[contr.User]; found {
-			log.Printf("Found core contributor: %v\n", user.User)
+		if _, found := chkr.coreContributors[contr.User]; found {
+			//log.Printf("Found core contributor: %v\n", user.User)
 			return true
 		}
 	}
@@ -77,16 +78,16 @@ func (chkr *checker) getPassedContributors() map[string]User {
 	contributors := strings.Split(chkr.conf.contributors, ",")
 	var users map[string]User
 	for _, contributor := range contributors {
-		users[contributor] = User{contributor}
+		users[contributor] = User{User: contributor}
 	}
 
 	return users
 }
 
-func (chkr *checker) getContributorsOfRepo(url string) ([]User, string) {
+func (chkr *checker) getUser(url string) string {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Fatalf("ERROR http.NewRequest - %v\n", err)
+		panic(err)
 	}
 
 	if chkr.conf.token != "" {
@@ -95,14 +96,61 @@ func (chkr *checker) getContributorsOfRepo(url string) ([]User, string) {
 
 	resp, err := chkr.client.Do(req)
 	if err != nil {
-		log.Fatalf("ERROR client.Do - %v\n", err)
+		panic(err)
 	}
 	defer resp.Body.Close()
 
-	var users []User
-	err = json.NewDecoder(resp.Body).Decode(&users)
+	if resp.StatusCode == http.StatusNoContent {
+		io.Copy(ioutil.Discard, resp.Body)
+		return ""
+	}
+
+	content, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalf("ERROR Decode - %v\n", err)
+		panic(err)
+	}
+	type RealUser struct {
+		Name string `json:"name"`
+	}
+
+	var realUser RealUser
+	err = json.Unmarshal(content, &realUser)
+	if err != nil {
+		panic(err)
+	}
+
+	return realUser.Name
+}
+
+func (chkr *checker) getContributorsOfRepo(url string) ([]User, string) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	if chkr.conf.token != "" {
+		req.Header.Add("Authorization", fmt.Sprintf("token %v", chkr.conf.token))
+	}
+
+	resp, err := chkr.client.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNoContent {
+		io.Copy(ioutil.Discard, resp.Body)
+		return nil, ""
+	}
+
+	content, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+	var users []User
+	err = json.Unmarshal(content, &users)
+	if err != nil {
+		panic(err)
 	}
 
 	return users, parseLinkHeader(resp.Header.Get("Link"))
@@ -125,7 +173,7 @@ func parseLinkHeader(link string) string {
 func (chkr *checker) getRepos(url string) ([]Repo, string) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Fatalf("ERROR http.NewRequest - %v\n", err)
+		panic(err)
 	}
 
 	if chkr.conf.token != "" {
@@ -134,14 +182,14 @@ func (chkr *checker) getRepos(url string) ([]Repo, string) {
 
 	resp, err := chkr.client.Do(req)
 	if err != nil {
-		log.Fatalf("ERROR client.Do - %v\n", err)
+		panic(err)
 	}
 	defer resp.Body.Close()
 
 	var repos []Repo
 	err = json.NewDecoder(resp.Body).Decode(&repos)
 	if err != nil {
-		log.Fatalf("ERROR Decode - %v\n", err)
+		panic(err)
 	}
 
 	return repos, parseLinkHeader(resp.Header.Get("Link"))
@@ -150,7 +198,7 @@ func (chkr *checker) getRepos(url string) ([]Repo, string) {
 func (chkr *checker) getPullRequests(url string) ([]PullReq, string) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Fatalf("ERROR http.NewRequest - %v\n", err)
+		panic(err)
 	}
 
 	if chkr.conf.token != "" {
@@ -159,14 +207,14 @@ func (chkr *checker) getPullRequests(url string) ([]PullReq, string) {
 
 	resp, err := chkr.client.Do(req)
 	if err != nil {
-		log.Fatalf("ERROR client.Do - %v\n", err)
+		panic(err)
 	}
 	defer resp.Body.Close()
 
 	var pullReqs []PullReq
 	err = json.NewDecoder(resp.Body).Decode(&pullReqs)
 	if err != nil {
-		log.Fatalf("ERROR Decode - %v\n", err)
+		panic(err)
 	}
 
 	return pullReqs, parseLinkHeader(resp.Header.Get("Link"))
