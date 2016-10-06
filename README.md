@@ -1,11 +1,26 @@
 # pr-checker
 Checks FT UPP's PRs which are too long time open
 
-## Install & run
+## Install
 
 ```
 go get -u github.com/tosan88/pr-checker
+```
 
+## Usage
+
+```
+Usage: pr-checker [OPTIONS]
+
+Checks FT UPP's PRs which are too long time open
+
+Options:
+  --token=""          The GitHub Api's OAuth Token. ($TOKEN)
+  --contributors=""   The list of contributors. Only those repos will be considered where these people contributed. Optional ($CONTRIBUTORS)
+  --min-days="14"     The number of minimum days which an open PR could stay open. Only PRs which are opened more than that number of days are retrieved. Optional ($MIN_DAYS)
+```
+
+```
 #Linux
 export TOKEN=<your-GH-token>
 ./pr-checker
