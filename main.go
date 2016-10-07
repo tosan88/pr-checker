@@ -101,7 +101,10 @@ func main() {
 func runChecker(chkr *checker) {
 	chkr.decideCoreContributors()
 	repos := chkr.collectRepos()
-
+	var count int
+	defer func() {
+		log.Printf("There are %v pull requests open across FT repositories relevant for UPP\n", count)
+	}()
 	for _, repo := range repos {
 		contributors := chkr.collectContributors(repo.ContributorsURL)
 
@@ -109,7 +112,7 @@ func runChecker(chkr *checker) {
 			prs := chkr.collectPullRequests(repo.PullsURL.Url)
 
 			for _, pr := range prs {
-				minDateTime := time.Now().AddDate(0, 0, chkr.conf.minDays)
+				minDateTime := time.Now().AddDate(0, 0, -chkr.conf.minDays)
 
 				parsedCreatedAt, err := time.Parse("2006-01-02T15:04:05Z", pr.CreatedAt)
 				if err != nil {
@@ -118,6 +121,7 @@ func runChecker(chkr *checker) {
 				if parsedCreatedAt.Before(minDateTime) {
 					realUserName := chkr.getUser(pr.User.UserURL)
 					log.Printf("PR %v (%v) open by %v(%v) since %v, updated at %v\n", pr.HTMLURL, pr.Title, pr.User.User, realUserName, pr.CreatedAt, pr.UpdatedAt)
+					count++
 				}
 
 			}
